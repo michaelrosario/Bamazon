@@ -2,11 +2,10 @@ var mysql = require("mysql");
 var inquirer = require("inquirer");
 inquirer.registerPrompt('number', require('inquirer-number-plus'));
 
-// GLOBAL VARIABLES
+var department = [];
+var departmentChoices = [];
 
-let products = []; // keep track of products locally
-let departments = []; 
-
+// MYSQL CONNECTION SETTINGS
 let connection = mysql.createConnection({
   
   host: "localhost",
@@ -18,36 +17,31 @@ let connection = mysql.createConnection({
   password: "secret",
 
   database: "bamazon"
+
 });
 
-// connect to the mysql server and sql database
+// CONNECT TO MYSQL SERVER
 connection.connect(function(err) {
   if (err) throw err;
-  // run the start function after the connection is made to prompt the user
+  
+  // Run the start function
   printWithLine(createDisplay("",100));
   printWithLine(createDisplay("SUPERVISOR PORTAL",100));
   start();
 });
 
 function start() {
-  var query = "SELECT * from products";
-  connection.query(query, 
-  function(err,results) {
-      if(err) { 
-        console.log('There was an error retrieving the products');
-      }
-      products = results;
-  });
-
-  var supervisorQuery = "SELECT * from departments";
-  connection.query(supervisorQuery, 
-  function(err,results) {
-      if(err) { 
-        console.log('There was an error retrieving departments data');
-      }
-      departments = results;
-      promptSupervisor();
-  });
+    var departmentQuery = "SELECT * from departments";
+    connection.query(departmentQuery, 
+        function(err,results) {
+            if(err) { 
+            console.log('There was an error retrieving the departments');
+            }
+            departments = results;
+            departmentChoices = departments.map(x => x.department_name); 
+        });
+    
+    promptSupervisor();
 }
 
 function promptSupervisor(currentChoice) {
@@ -71,10 +65,10 @@ function promptSupervisor(currentChoice) {
       .then(function(answer) {
         switch (answer.action) {
           case "View Product Sales by Department":
-           
+            displaySalesByDepartment();
             break;
           case "Create New Department":
-           
+            createDepartment();
             break;
           case "exit":
             console.log("Thank you! Come again!");
@@ -82,7 +76,67 @@ function promptSupervisor(currentChoice) {
             break;
         }
       });
+}
+
+function displaySalesByDepartment() {
+
+    var query = "SELECT department_id, b.department_name, over_head_costs, SUM(a.product_sales) as product_sales, SUM(a.product_sales)-over_head_costs as total_profit FROM products a RIGHT JOIN departments b ON a.department_name = b.department_name GROUP BY a.department_name, b.department_name ORDER BY b.department_id";
+    connection.query(query, 
+    function(err,results) {
+        if(err) { 
+          console.log('There was an error retrieving the products');
+        }
+        displayGraph(results);
+        promptSupervisor("View Product Sales by Department");
+    });
   
+}
+
+function createDepartment(){
+inquirer
+    .prompt([{
+        name: "department_name",
+        type: "input",
+        message: "Enter a new department name:",
+        validate: checkCurrentDepartments
+    },{
+        name: "over_head_costs",
+        type: "input",
+        message: "What is the over-head costs?",
+        validate: validateDecimal
+    }])
+    .then(function(answer) {
+        
+        console.log(answer);
+        var overHeadCosts = parseFloat(answer.over_head_costs).toFixed(2);
+        var departmentName = answer.department_name.trim();
+        var insertQuery = `INSERT INTO departments
+        (
+            department_name, 
+            over_head_costs
+        ) VALUES (
+            "${departmentName}",
+            "${overHeadCosts}"
+        )`;
+        connection.query(insertQuery, function(err,results) {
+            if(err) { 
+                console.log('There was an error adding the department');
+            }
+            printWithLine(createDisplay("",100));
+            printWithLine(createDisplay(`${departmentName} department was added successfully.`,100));
+            start();
+        });
+    });
+   
+}
+
+function checkCurrentDepartments(input){
+    var department = input.trim();
+    if(departmentChoices.indexOf(department) === -1){
+        return true;
+    } else {
+        return "Department already exists";
+    }
 }
 
 function validateDecimal(number) {
@@ -94,11 +148,11 @@ function displayGraph(results) {
 
   //print header
   var header = "";
-  header += "| "+createDisplay("ID",3) + "|";
-  header += " "+createDisplay("PRODUCT NAME",65) + "|";
-  header += " "+createDisplay("DEPARTMENT",20) + "|";
-  header += " "+createDisplay("PRICE",14) + "|";
-  header += " "+createDisplay("QUANTITY",10) + "|";
+  header += "| "+createDisplay("DEPARTMENT ID",15) + "|";
+  header += " "+createDisplay("DEPARTMENT NAME",18) + "|";
+  header += " "+createDisplay("OVER-HEAD COSTS",18) + "|";
+  header += " "+createDisplay("PRODUCT SALES",18) + "|";
+  header += " "+createDisplay("TOTAL PROFIT",18) + "|";
   printWithLine(createDisplay(" ",header.length-1));
   printWithLine(header);
  
@@ -106,11 +160,27 @@ function displayGraph(results) {
   currentItem = "";
   var currentItem = "";
   for( var i = 0 ; i < results.length ; i++ ) {
-    currentItem += "| "+createDisplay(results[i].item_id,3) + "|";
-    currentItem += " "+createDisplay(results[i].product_name,65) + "|";
-    currentItem += " "+createDisplay(results[i].department_name,20) + "|";
-    currentItem += " $"+createDisplay(results[i].price.toFixed(2),13) + "|";
-    currentItem += " "+createDisplay(results[i].stock_quantity,10) + "|";
+    var overHeadCosts = "$"+parseInt(results[i].over_head_costs).toFixed(2);
+    var productSales = 0;
+    if(results[i].product_sales){
+        productSales = "$"+parseInt(results[i].product_sales).toFixed(2);
+    }
+    var totalProfit = 0;
+    if(results[i].total_profit){
+        totalProfit = parseInt(results[i].total_profit).toFixed(2);
+        if(totalProfit < 0){ 
+            totalProfit = "-$"+ (-1*totalProfit);
+        } else {
+            totalProfit = "$"+totalProfit;
+        }
+    } else {
+        totalProfit = 0;
+    }
+    currentItem += "| "+createDisplay(results[i].department_id,15) + "|";
+    currentItem += " "+createDisplay(results[i].department_name,18) + "|";
+    currentItem += " "+createDisplay(overHeadCosts,18) + "|";
+    currentItem += " "+createDisplay(productSales,18) + "|";
+    currentItem += " "+createDisplay(totalProfit,18) + "|";
     printWithLine(currentItem);
     currentItem = "";
   }

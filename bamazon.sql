@@ -1,7 +1,11 @@
+/* CREATE DATABASE */
+
 DROP DATABASE IF EXISTS bamazon;
 CREATE DATABASE bamazon;
 
 USE bamazon;
+
+/* CREATE TABLES */
 
 CREATE TABLE products  (
 	item_id INT NOT NULL AUTO_INCREMENT,
@@ -12,6 +16,15 @@ CREATE TABLE products  (
 	product_sales decimal(24, 2) default 0,
 	PRIMARY KEY (item_id)
 );
+
+CREATE TABLE departments  (
+	department_id INT NOT NULL AUTO_INCREMENT,
+	department_name VARCHAR(200) UNIQUE NOT NULL,
+	over_head_costs decimal(24, 2) NOT NULL,
+	PRIMARY KEY (department_id)
+);
+
+/* INSERT SEEDER DATA */
 
 INSERT INTO products (
 	product_name,
@@ -103,16 +116,6 @@ INSERT INTO products (
 		'17.99',
 		'30'
 	);
-
-
-
-
-CREATE TABLE departments  (
-	department_id INT NOT NULL AUTO_INCREMENT,
-	department_name VARCHAR(200) NOT NULL,
-	over_head_costs decimal(24, 2) NOT NULL,
-	PRIMARY KEY (department_id)
-);
 
 INSERT INTO departments (
  	department_name,

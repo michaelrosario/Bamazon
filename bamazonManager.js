@@ -3,11 +3,11 @@ var inquirer = require("inquirer");
 inquirer.registerPrompt('number', require('inquirer-number-plus'));
 
 // GLOBAL VARIABLES
+let products = [];          // keep track of products locally
+let departments = [];       // keep track of departments locally
+let departmentChoices = []; // choices when creating new products
 
-let products = []; // keep track of products locally
-let departments = [];
-let departmentChoices = [];
-
+// MYSQL CONNECTION SETTINGS
 let connection = mysql.createConnection({
   
   host: "localhost",
@@ -161,7 +161,7 @@ function promptAddInventory(){
 }
 
 function promptAddProduct(){
-    inquirer
+  inquirer
     .prompt([{
         name: "product_name",
         type: "input",
