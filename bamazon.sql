@@ -7,9 +7,17 @@ CREATE TABLE products  (
 	item_id INT NOT NULL AUTO_INCREMENT,
 	product_name VARCHAR(200) NOT NULL,
 	department_name VARCHAR(100) NOT NULL,
-	price decimal(12, 2) NOT NULL,
+	price decimal(24, 2) NOT NULL,
 	stock_quantity INT default 0,
+	product_sales decimal(24, 2) NOT NULL,
 	PRIMARY KEY (item_id)
+);
+
+CREATE TABLE departments  (
+	department_id INT NOT NULL AUTO_INCREMENT,
+	department_name VARCHAR(200) NOT NULL,
+	over_head_costs decimal(24, 2) NOT NULL,
+	PRIMARY KEY (department_id)
 );
 
 INSERT INTO products (

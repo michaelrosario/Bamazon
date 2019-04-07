@@ -1,5 +1,6 @@
 var mysql = require("mysql");
 var inquirer = require("inquirer");
+inquirer.registerPrompt('number', require('inquirer-number-plus'));
 
 // GLOBAL VARIABLES
 
@@ -22,6 +23,8 @@ let connection = mysql.createConnection({
 connection.connect(function(err) {
   if (err) throw err;
   // run the start function after the connection is made to prompt the user
+  printWithLine(createDisplay("",100));
+  printWithLine(createDisplay("CUSTOMER PORTAL",100));
   start();
 });
 
@@ -33,7 +36,6 @@ function start() {
         console.log('There was an error retrieving the products');
       }
       products = results;
-      displayGraph(results);
       prompCustomer();
   });
 }
@@ -52,6 +54,7 @@ function prompCustomer() {
       .then(function(answer) {
         switch (answer.action) {
           case "Purchase an item":
+            displayGraph(products);
             startOrder();
             break;
           case "exit":
@@ -66,8 +69,9 @@ function startOrder(){
   inquirer
       .prompt({
         name: "item",
-        type: "input",
-        message: "Enter the ID of the item you want to purchase:"
+        type: "number",
+        message: "Enter the ID of the item you want to purchase:",
+        min: 1
       })
       .then(function(answer) {
 
@@ -77,48 +81,89 @@ function startOrder(){
           return item["item_id"] == product_id;
         });
         if(resultArray.length){
-
+          let item = resultArray[0];
+          let id = item.item_id; 
+          let product = item.product_name;
+          let price = item.price;
+          let stock = item.stock_quantity;
           if(resultArray[0].stock_quantity <= 0){
             
-            console.log("Item is out of stock!");
+            printWithLine(createDisplay("",100));
+            printWithLine(createDisplay(`${product}  ($${price.toFixed(2)}) [${stock ? stock + ' in stock' : 'Out of Stock'}]`,100));
+            printWithLine(createDisplay('Please enter a different product ID',100));
             startOrder();
 
           } else {
-
-            console.log("Processing order: `"+resultArray[0].product_name+"`");
-            processOrder(product_id);
-
+            printWithLine(createDisplay("",100));
+            printWithLine(createDisplay(`${product}  ($${price.toFixed(2)}) [${stock ? stock + ' in stock' : 'Out of Stock'}]`,100));
+            promptForQuantity(resultArray[0],product_id);
+            
           }
 
         } else {
-          console.log("You entered an invalid item ID - `"+product_id+"`");
+          printWithLine(createDisplay("",100));
+          printWithLine(createDisplay("You entered an invalid item ID - "+product_id,100));
           startOrder();
         }
   });
 }
 
-function processOrder(id){
-  // check quantity
-  var query = "SELECT stock_quantity from products WHERE item_id =" + id;
-  connection.query(query, 
-  function(err,results) {
-      if(err) { 
-        console.log('There was an error processing your order');
-      }
-      var quantity = parseInt(stock_quantity);
-      if(quantity <= 0){
-        
-        console.log("This item is out of stock, choose a different product.");
+function promptForQuantity(product,id) {
+  var query = "SELECT stock_quantity,price from products WHERE item_id =" + id;
+            connection.query(query, 
+            function(err,results) {
+                if(err) { 
+                  console.log('There was an error loading the item.');
+                }
+                var quantity = parseInt(product.stock_quantity);
+                var price = parseInt(product.price);
+                
+                if(quantity <= 0){
+                  
+                  console.error("This item is out of stock, choose a different product.");
+                  start();
+
+                } else if(quantity > 0){
+
+                  inquirer
+                    .prompt({
+                      name: "quantity",
+                      type: "number",
+                      message: `How many do you want to buy? (1-${quantity})`,
+                      min: 1,
+                      max: quantity
+                    })
+                    .then(function(answer) {
+                      if(answer.quantity > 0) {
+                        printWithLine(createDisplay("",100));
+                        printWithLine(createDisplay("Processing order: `"+product.product_name+"`",100));
+                        var requestedQuantity = parseInt(answer.quantity);
+                        var newQuantity = parseInt(quantity) - requestedQuantity;
+                        var totalCost = price*requestedQuantity;
+                        purchaseItem(id,newQuantity,totalCost);
+                      }  else {
+                        console.log("Invalid quantity.");
+                        promptForQuantity(product,id)
+                      }
+                    });
+              
+                }
+            });
+}
+
+function purchaseItem(id,qty,total){
+  var updateQuery = "UPDATE products SET stock_quantity = "+ qty +" WHERE item_id =" + id;
+  connection.query(updateQuery, 
+    function(err,results) {
+        if(err) { 
+          console.log('There was an error processing your order');
+        }
+        printWithLine(createDisplay(`ORDER WAS SUCCESSFULLY PROCESSED! TOTAL $${total.toFixed(2)}`,100));
         start();
-
-      } else {
-
-        // Update product
-
-      }
-  });
+    });
 
 }
+
 
 function displayGraph(results){
 
@@ -126,6 +171,7 @@ function displayGraph(results){
   var header = "";
   header += "| "+createDisplay("ID",3) + "|";
   header += " "+createDisplay("PRODUCT NAME",65) + "|";
+  header += " "+createDisplay("DEPARTMENT",20) + "|";
   header += " "+createDisplay("PRICE",14) + "|";
   header += " "+createDisplay("QUANTITY",10) + "|";
   printWithLine(createDisplay(" ",header.length-1));
@@ -137,6 +183,7 @@ function displayGraph(results){
   for( var i = 0 ; i < results.length ; i++ ) {
     currentItem += "| "+createDisplay(results[i].item_id,3) + "|";
     currentItem += " "+createDisplay(results[i].product_name,65) + "|";
+    currentItem += " "+createDisplay(results[i].department_name,20) + "|";
     currentItem += " $"+createDisplay(results[i].price.toFixed(2),13) + "|";
     currentItem += " "+createDisplay(results[i].stock_quantity,10) + "|";
     printWithLine(currentItem);
@@ -147,7 +194,7 @@ function displayGraph(results){
 // format columns to be the same length
 function createDisplay(input,limit){
   var limit = parseInt(limit);
-  if(input != ""){
+  if(input != "" || input == 0){
     var inputStr = input.toString();
     var strLength = inputStr.trim().length;
     if(input.length > limit){

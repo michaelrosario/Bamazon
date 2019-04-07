@@ -19,6 +19,7 @@
   "homepage": "https://github.com/michaelrosario/Bamazon#readme",
   "dependencies": {
     "inquirer": "^6.2.2",
+    "inquirer-number-plus": "^1.0.0",
     "mysql": "^2.16.0"
   }
 }
