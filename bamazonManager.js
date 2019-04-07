@@ -5,6 +5,8 @@ inquirer.registerPrompt('number', require('inquirer-number-plus'));
 // GLOBAL VARIABLES
 
 let products = []; // keep track of products locally
+let departments = [];
+let departmentChoices = [];
 
 let connection = mysql.createConnection({
   
@@ -38,6 +40,17 @@ function start() {
       products = results;
       prompCustomer();
   });
+
+  var departmentQuery = "SELECT * from departments";
+  connection.query(departmentQuery, 
+    function(err,results) {
+        if(err) { 
+          console.log('There was an error retrieving the departments');
+        }
+        departments = results;
+        departmentChoices = departments.map(x => x.department_name); 
+    });
+
 }
 
 function prompCustomer(currentChoice) {
@@ -156,9 +169,9 @@ function promptAddProduct(){
         min: 1
     },{
         name: "department_name",
-        type: "input",
-        message: "Enter the department name:",
-        min: 1
+        type: "list",
+        message: "Select the department:",
+        choices: departmentChoices
     },{
         name: "price",
         type: "input",

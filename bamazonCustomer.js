@@ -152,7 +152,7 @@ function promptForQuantity(product,id) {
 }
 
 function purchaseItem(id,qty,total){
-  var updateQuery = "UPDATE products SET stock_quantity = "+ qty +" WHERE item_id =" + id;
+  var updateQuery = "UPDATE products SET stock_quantity = "+ qty +", product_sales = product_sales + " + total + " WHERE item_id =" + id;
   connection.query(updateQuery, 
     function(err,results) {
         if(err) { 
