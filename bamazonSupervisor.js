@@ -106,8 +106,7 @@ inquirer
         validate: validateDecimal
     }])
     .then(function(answer) {
-        
-        console.log(answer);
+      
         var overHeadCosts = parseFloat(answer.over_head_costs).toFixed(2);
         var departmentName = answer.department_name.trim();
         var insertQuery = `INSERT INTO departments

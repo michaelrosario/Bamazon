@@ -3,26 +3,24 @@ var inquirer = require("inquirer");
 inquirer.registerPrompt('number', require('inquirer-number-plus'));
 
 // GLOBAL VARIABLES
-
 let products = []; // keep track of products locally
 
+// CONNECTION SETTINGS
 let connection = mysql.createConnection({
   
   host: "localhost",
-
   port: 8889, 
-
   user: "root",
-
   password: "secret",
-
   database: "bamazon"
+
 });
 
-// connect to the mysql server and sql database
+// CONNECT TO MYSQL DATABASE
 connection.connect(function(err) {
   if (err) throw err;
-  // run the start function after the connection is made to prompt the user
+  
+  // start functions
   printWithLine(createDisplay("",100));
   printWithLine(createDisplay("CUSTOMER PORTAL",100));
   start();
@@ -35,7 +33,7 @@ function start() {
       if(err) { 
         console.log('There was an error retrieving the products');
       }
-      products = results;
+      products = results; // store to local copy of DB
       prompCustomer();
   });
 }
@@ -63,8 +61,9 @@ function prompCustomer() {
             break;
         }
       });
-  
 }
+
+// Ask user for the ID for purchase
 function startOrder(){
   inquirer
       .prompt({
@@ -77,23 +76,28 @@ function startOrder(){
 
         var product_id = answer.item;
 
+        // Check if ID exists in the local copy of DB
         let resultArray = products.filter(function(item) {
           return item["item_id"] == product_id;
         });
+
         if(resultArray.length){
           let item = resultArray[0];
           let id = item.item_id; 
           let product = item.product_name;
           let price = item.price;
           let stock = item.stock_quantity;
+
+          // Out of Stock - Start again
           if(resultArray[0].stock_quantity <= 0){
-            
             printWithLine(createDisplay("",100));
             printWithLine(createDisplay(`${product}  ($${price.toFixed(2)}) [${stock ? stock + ' in stock' : 'Out of Stock'}]`,100));
             printWithLine(createDisplay('Please enter a different product ID',100));
             startOrder();
 
           } else {
+
+            // In stock, run function to ask for quantity
             printWithLine(createDisplay("",100));
             printWithLine(createDisplay(`${product}  ($${price.toFixed(2)}) [${stock ? stock + ' in stock' : 'Out of Stock'}]`,100));
             promptForQuantity(resultArray[0],product_id);
@@ -101,54 +105,59 @@ function startOrder(){
           }
 
         } else {
+
+          // Invalid Item ID
           printWithLine(createDisplay("",100));
           printWithLine(createDisplay("You entered an invalid item ID - "+product_id,100));
           startOrder();
+
         }
   });
 }
 
+// Ask for how many items to buy, we limit the user to select 1 to actual inventory amount
 function promptForQuantity(product,id) {
-  var query = "SELECT stock_quantity,price from products WHERE item_id =" + id;
-            connection.query(query, 
-            function(err,results) {
-                if(err) { 
-                  console.log('There was an error loading the item.');
-                }
-                var quantity = parseInt(product.stock_quantity);
-                var price = parseInt(product.price);
-                
-                if(quantity <= 0){
-                  
-                  console.error("This item is out of stock, choose a different product.");
-                  start();
+  var query = "SELECT stock_quantity,price from products WHERE ?";
+  connection.query(query,{
+      item_id: id
+    },
+    function(err,results) {
+      if(err) { 
+        console.log('There was an error loading the item.');
+      }
+      var quantity = parseInt(product.stock_quantity);
+      var price = parseInt(product.price);
+      
+      if(quantity <= 0){
+        
+        console.error("This item is out of stock, choose a different product.");
+        start();
 
-                } else if(quantity > 0){
+      } else if(quantity > 0){
 
-                  inquirer
-                    .prompt({
-                      name: "quantity",
-                      type: "number",
-                      message: `How many do you want to buy? (1-${quantity})`,
-                      min: 1,
-                      max: quantity
-                    })
-                    .then(function(answer) {
-                      if(answer.quantity > 0) {
-                        printWithLine(createDisplay("",100));
-                        printWithLine(createDisplay("Processing order: `"+product.product_name+"`",100));
-                        var requestedQuantity = parseInt(answer.quantity);
-                        var newQuantity = parseInt(quantity) - requestedQuantity;
-                        var totalCost = price*requestedQuantity;
-                        purchaseItem(id,newQuantity,totalCost);
-                      }  else {
-                        console.log("Invalid quantity.");
-                        promptForQuantity(product,id)
-                      }
-                    });
-              
-                }
-            });
+        inquirer
+          .prompt({
+            name: "quantity",
+            type: "number",
+            message: `How many do you want to buy? (1-${quantity})`,
+            min: 1,
+            max: quantity
+          })
+          .then(function(answer) {
+            if(answer.quantity > 0) {
+              printWithLine(createDisplay("",100));
+              printWithLine(createDisplay("Processing order: `"+product.product_name+"`",100));
+              var requestedQuantity = parseInt(answer.quantity);
+              var newQuantity = parseInt(quantity) - requestedQuantity;
+              var totalCost = price*requestedQuantity;
+              purchaseItem(id,newQuantity,totalCost);
+            }  else {
+              console.log("Invalid quantity.");
+              promptForQuantity(product,id)
+            }
+          });
+        }
+    });
 }
 
 function purchaseItem(id,qty,total){
